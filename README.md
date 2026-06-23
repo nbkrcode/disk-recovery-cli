@@ -150,11 +150,11 @@ disk-recovery-cli/
 ```
 
 ## 🗺️ Roadmap
-[ ] Rust rewrite — in progress, targeting memory safety and zero-copy I/O performance
-[ ] --dry-run mode — estimate recoverability without writing to disk
-[ ] JSON/CSV output for machine-readable recovery reports
-[ ] Retry logic with configurable attempts per bad sector
-[ ] Parallel file recovery using concurrent.futures
+- [ ] Rust rewrite — in progress, targeting memory safety and zero-copy I/O performance
+- [ ] --dry-run mode — estimate recoverability without writing to disk
+- [ ] JSON/CSV output for machine-readable recovery reports
+- [ ] Retry logic with configurable attempts per bad sector
+- [ ] Parallel file recovery using concurrent.futures
 
 ## 📄 License
 
