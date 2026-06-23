@@ -1,0 +1,60 @@
+# ========================
+# Python
+# ========================
+# Fichiers compilés
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environnements virtuels
+venv/
+.venv/
+env/
+.env
+
+# Outils de packaging / distribution
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ========================
+# Fichiers générés par le projet
+# ========================
+# Ne pas push les rapports de hash ou les dossiers de test/récupération
+rapport_hashes.txt
+*.log
+
+# ========================
+# macOS
+# ========================
+# Fichiers invisibles créés par le Finder
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# ========================
+# Éditeurs de code 
+# ========================
+# VSCode
+.vscode/
+
+# IntelliJ / PyCharm
+.idea/
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
