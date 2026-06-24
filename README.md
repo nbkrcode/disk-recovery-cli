@@ -1,4 +1,4 @@
-# 🛠️ disk-recovery-cli
+# disk-recovery-cli
 
 > A command-line tool for salvaging data from partially corrupted hard drives — reading block by block, surviving I/O errors, and producing a full SHA-256 integrity report.
 
@@ -8,7 +8,7 @@
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 - [Motivation](#-motivation)
 - [Features](#-features)
 - [How it works](#-how-it-works)
@@ -22,12 +22,12 @@
 
 ---
 
-## 🎯 Motivation
+## Motivation
 Standard copy tools (`cp`, Finder, Windows Explorer) share a fatal flaw: they **abort on the first I/O error**, leaving you with nothing. After personally losing data during a file transfer from a failing drive, I built `disk-recovery-cli` to solve exactly this. When a bad sector is hit, the tool pads the block with null bytes, records the event, and **keeps going** — because a partial file is almost always better than no file.
 
 ---
 
-## ✨ Features
+## Features
 - **Block-by-block recovery** via raw POSIX syscalls (`os.read` / `os.write` / `os.lseek`)
 - **Hardware fault isolation** — catches `errno.EIO` per block without aborting the entire file
 - **Three recovery states** per file: `SAIN` (intact), `PARTIEL` (bad sectors patched), `ERREUR` (unreadable)
@@ -39,7 +39,7 @@ Standard copy tools (`cp`, Finder, Windows Explorer) share a fatal flaw: they **
 
 ---
 
-## 🔬 How it works
+## How it works
 The recovery pipeline runs in two phases:
 
 ```text
@@ -58,7 +58,7 @@ Phase 2 — Block-by-block copy (per file)
 
 Using os.lseek(..., os.SEEK_CUR) to skip past a bad sector mirrors the behaviour of professional tools like ddrescue, keeping the output file structurally coherent with the original.
 
-## 📦 Installation
+## Installation
 
 ```Bash
 git clone [https://github.com/nbkrcode/disk-recovery-cli.git](https://github.com/nbkrcode/disk-recovery-cli.git)
@@ -68,7 +68,7 @@ pip install -r requirements.txt
 
 tqdm is the only external dependency. Python 3.8+ required.
 
-## 🚀 Usage
+## Usage
 
 ```Bash
 python recovery.py <source> <destination> [--block-size <bytes>]
@@ -93,7 +93,7 @@ python recovery.py /dev/sdb1 /mnt/rescue --block-size 65536
 
 ⚠️ Always run as a read-only operation on the source — never write to the failing drive. Use a healthy destination on a separate device.
 
-## 📊 Output example
+## Output example
 
 ```Plaintext
 [1/2] Analyse du dossier source en cours : /Volumes/CorruptedDrive
@@ -117,7 +117,7 @@ a3f1c8... documents/thesis.pdf
 ...
 ```
 
-## 🧪 Testing
+## Testing
 
 test_corruption.py validates bad-sector handling without any physical hardware by using unittest.mock.patch to inject an OSError(EIO) on the second os.read call.
 
@@ -139,7 +139,7 @@ Contenu récupéré : b'AAAAAAAAAA\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00CCCCCC
 
 The null-padded middle block confirms that bad-sector isolation works correctly: the first and third blocks are intact, and the corrupted second block is replaced with zeros rather than crashing the process.
 
-## 📁 Project structure
+## Project structure
 
 ```Plaintext
 disk-recovery-cli/
@@ -149,13 +149,13 @@ disk-recovery-cli/
 └── README.md
 ```
 
-## 🗺️ Roadmap
+## Roadmap
 - [ ] Rust rewrite — in progress, targeting memory safety and zero-copy I/O performance
 - [ ] --dry-run mode — estimate recoverability without writing to disk
 - [ ] JSON/CSV output for machine-readable recovery reports
 - [ ] Retry logic with configurable attempts per bad sector
 - [ ] Parallel file recovery using concurrent.futures
 
-## 📄 License
+## License
 
 MIT © nbkrcode
