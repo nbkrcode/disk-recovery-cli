@@ -26,7 +26,7 @@ def recuperer_fichier(chemin_source, chemin_destination, taille_bloc):
         fd_dest = os.open(chemin_destination, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
     except OSError:
         # Erreur de droits ou fichier inexistant
-        return "ERREUR"
+        return "ERREUR", None
 
     fichier_est_partiel = False
     hasher=hashlib.sha256()  #calcul du hash pour verif integrité
@@ -55,7 +55,7 @@ def recuperer_fichier(chemin_source, chemin_destination, taille_bloc):
                 # Autre erreur critique pendant la lecture
                 os.close(fd_source)
                 os.close(fd_dest)
-                return "ERREUR"
+                return "ERREUR", None
 
     os.close(fd_source)
     os.close(fd_dest)
