@@ -3,6 +3,8 @@ import errno
 import argparse
 from tqdm import tqdm  
 import hashlib
+import json
+from datetime import datetime
 
 def lister_fichiers(dossier_source):
     """
@@ -19,16 +21,24 @@ def lister_fichiers(dossier_source):
 def recuperer_fichier(chemin_source, chemin_destination, taille_bloc):
     """ 
     Copie un fichier unique.
-    Retourne un code d'état : "SAIN", "PARTIEL" ou "ERREUR"
+    Retourne : (statut, empreinte, details)
+      - statut : "SAIN", "PARTIEL" ou "ERREUR"
+      - empreinte : SHA-256 hexdigest ou None
+      - details : dict contenant des infos (blocs_corrompus, erreur_msg, etc.)
     """
+
+    details = {
+        "blocs_corrompus": 0,
+        "erreur_msg": None
+    }
     try:
         fd_source = os.open(chemin_source, os.O_RDONLY)
         fd_dest = os.open(chemin_destination, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
     except OSError:
         # Erreur de droits ou fichier inexistant
-        return "ERREUR", None
+        return "ERREUR", None, details
 
-    fichier_est_partiel = False
+    
     hasher=hashlib.sha256()  #calcul du hash pour verif integrité
 
     while True:
@@ -40,9 +50,9 @@ def recuperer_fichier(chemin_source, chemin_destination, taille_bloc):
             hasher.update(data)  # mise à jour du hash avec les données lues
         except OSError as e:
             if e.errno == errno.EIO:
-                # Erreur matérielle détectée : on marque le fichier comme partiellement corrompu
-                fichier_est_partiel = True
-                
+                # Erreur matérielle détectée : on incrémente le compteur
+                details["blocs_corrompus"] += 1
+
                 # On écrit des zéros pour maintenir la structure
                 zeros = b'\x00' * taille_bloc
                 os.write(fd_dest, zeros)
@@ -55,7 +65,8 @@ def recuperer_fichier(chemin_source, chemin_destination, taille_bloc):
                 # Autre erreur critique pendant la lecture
                 os.close(fd_source)
                 os.close(fd_dest)
-                return "ERREUR", None
+                details["erreur_msg"] = f"erreur critique lors de la lecture : {e.strerror or str(e)}"
+                return "ERREUR", None, details
 
     os.close(fd_source)
     os.close(fd_dest)
@@ -63,10 +74,10 @@ def recuperer_fichier(chemin_source, chemin_destination, taille_bloc):
     empreinte_finale = hasher.hexdigest() #calcul de l'empreinte finale du fichier copié
     
     # On détermine le statut final du fichier
-    if fichier_est_partiel:
-        return "PARTIEL", empreinte_finale
+    if details["blocs_corrompus"] > 0:
+        return "PARTIEL", empreinte_finale, details
     else:
-        return "SAIN", empreinte_finale
+        return "SAIN", empreinte_finale, details
 
 
 def recuperer_dossier(dossier_source, dossier_destination, taille_bloc):
@@ -90,6 +101,16 @@ def recuperer_dossier(dossier_source, dossier_destination, taille_bloc):
         "ERREUR": 0
     }
 
+    # Journalisation détaillée pour le rapport
+    rapport_details = {
+        "date_recuperation": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "source": dossier_source,
+        "destination": dossier_destination,
+        "taille_bloc": taille_bloc,
+        "fichiers_partiels": [],
+        "fichiers_perdus": []
+    }
+
     # Création de la barre de progression tqdm
     barre_progression = tqdm(liste_fichiers, desc="Récupération", unit="fichier")
 
@@ -103,7 +124,7 @@ def recuperer_dossier(dossier_source, dossier_destination, taille_bloc):
         os.makedirs(dossier_parent_dest, exist_ok=True)
         
         # 3. Lancement de la copie et récupération du statut
-        statut, empreinte = recuperer_fichier(chemin_complet_source, chemin_complet_dest, taille_bloc)
+        statut, empreinte, details = recuperer_fichier(chemin_complet_source, chemin_complet_dest, taille_bloc)
         
         if empreinte:
             with open(os.path.join(dossier_destination, "rapport_hashes.txt"), "a") as f_rapport:
@@ -112,8 +133,35 @@ def recuperer_dossier(dossier_source, dossier_destination, taille_bloc):
         # 4. Mise à jour des statistiques
         stats[statut] += 1
 
-    # --- AFFICHAGE DU RAPPORT FINAL ---
+        #on archive les détails pour le rapport final
+        if statut == "PARTIEL":
+            rapport_details["fichiers_partiels"].append({
+                "chemin": chemin_relatif,
+                "blocs_corrompus": details["blocs_corrompus"],
+                "octets_perdus_estimes": details["blocs_corrompus"] * taille_bloc,
+                "sha256": empreinte
+            })
+        elif statut == "ERREUR":
+            rapport_details["fichiers_perdus"].append({
+                "chemin": chemin_relatif,
+                "erreur_msg": details["erreur_msg"]
+            })
+
+    # Ecriture du rapport détaillé en JSON
     pourcentage_reussite = ((stats["SAIN"] + stats["PARTIEL"]) / total_fichiers) * 100
+    rapport_details["statistiques"] = {
+        "total_fichiers": total_fichiers,
+        "sains": stats["SAIN"],
+        "partiels": stats["PARTIEL"],
+        "perdus": stats["ERREUR"],
+        "taux_reussite": round(pourcentage_reussite, 2)
+    }
+
+    chemin_rapport_json = os.path.join(dossier_destination, "rapport_recuperation.json")
+    with open(chemin_rapport_json, "w", encoding="utf-8") as f_json:
+        json.dump(rapport_details, f_json, indent=2, ensure_ascii=False)
+
+    # --- AFFICHAGE DU RAPPORT FINAL ---
     
     print("\n" + "="*50)
     print(" 📊 RAPPORT DE RÉCUPÉRATION")
@@ -124,6 +172,7 @@ def recuperer_dossier(dossier_source, dossier_destination, taille_bloc):
     print(f" ❌ Fichiers totalement perdus     : {stats['ERREUR']}")
     print("-" * 50)
     print(f" Taux de récupération global      : {pourcentage_reussite:.2f}%")
+    print(f" 📄 Rapport détaillé enregistré   : {chemin_rapport_json}")
     print("="*50 + "\n")
 
 

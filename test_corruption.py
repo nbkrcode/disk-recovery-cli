@@ -33,11 +33,12 @@ print("\n--- DÉMARRAGE DE LA RÉCUPÉRATION ---")
 # 4. Magie : patch remplace os.read par fausse_lecture uniquement dans ce bloc 'with'
 with patch('os.read', side_effect=fausse_lecture):
     # On lit par blocs de 10 octets pour avoir 3 tours de boucle
-    statut, empreinte = recuperer_fichier("fichier_sain.txt", "fichier_sauve.txt", 10)
+    statut, empreinte, details = recuperer_fichier("fichier_sain.txt", "fichier_sauve.txt", 10)
 
 print("\n--- RÉSULTAT DU TEST ---")
 print(f"Statut final : {statut}")
 print(f"Empreinte SHA-256 : {empreinte}")
+print(f"Détails : {details}")
 
 # 5. Vérification visuelle
 with open("fichier_sauve.txt", "rb") as f:
