@@ -17,6 +17,13 @@ def lister_fichiers(dossier_source):
             chemins_fichiers.append(os.path.join(dossier_actuel, fichier))
     return chemins_fichiers
 
+def calculer_sha256(chemin_fichier, taille_bloc=65536):
+    """Calcule l'empreinte SHA-256 d'un fichier existant."""
+    hasher = hashlib.sha256()
+    with open(chemin_fichier, "rb") as f:
+        while chunk := f.read(taille_bloc):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 def recuperer_fichier(chemin_source, chemin_destination, taille_bloc):
     """ 
@@ -36,6 +43,7 @@ def recuperer_fichier(chemin_source, chemin_destination, taille_bloc):
         fd_dest = os.open(chemin_destination, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
     except OSError:
         # Erreur de droits ou fichier inexistant
+        details["erreur_msg"] = f"Ouverture impossible: {e.strerror or str(e)}"
         return "ERREUR", None, details
 
     
@@ -80,7 +88,7 @@ def recuperer_fichier(chemin_source, chemin_destination, taille_bloc):
         return "SAIN", empreinte_finale, details
 
 
-def recuperer_dossier(dossier_source, dossier_destination, taille_bloc):
+def recuperer_dossier(dossier_source, dossier_destination, taille_bloc, resume=False):
     """ Gère la logique globale de récupération avec barre de progression et statistiques """
     
     print(f"\n[1/2] Analyse du dossier source en cours : {dossier_source}")
@@ -98,7 +106,8 @@ def recuperer_dossier(dossier_source, dossier_destination, taille_bloc):
     stats = {
         "SAIN": 0,
         "PARTIEL": 0,
-        "ERREUR": 0
+        "ERREUR": 0,
+        "IGNORE": 0
     }
 
     # Journalisation détaillée pour le rapport
@@ -118,6 +127,15 @@ def recuperer_dossier(dossier_source, dossier_destination, taille_bloc):
         # 1. Préparation des chemins
         chemin_relatif = os.path.relpath(chemin_complet_source, dossier_source)
         chemin_complet_dest = os.path.join(dossier_destination, chemin_relatif)
+
+        if resume and os.path.exists(chemin_complet_dest):
+            try:
+                if os.path.getsize(chemin_complet_dest) == os.path.getsize(chemin_complet_source):
+                    stats["IGNORE"] += 1
+                    continue
+            except OSError:
+                # Si on ne peut pas obtenir la taille, on continue quand même
+                pass
         
         # 2. Création des dossiers cibles si nécessaires
         dossier_parent_dest = os.path.dirname(chemin_complet_dest)
@@ -148,12 +166,13 @@ def recuperer_dossier(dossier_source, dossier_destination, taille_bloc):
             })
 
     # Ecriture du rapport détaillé en JSON
-    pourcentage_reussite = ((stats["SAIN"] + stats["PARTIEL"]) / total_fichiers) * 100
+    pourcentage_reussite = ((stats["SAIN"] + stats["PARTIEL"] + stats["IGNORE"]) / total_fichiers) * 100
     rapport_details["statistiques"] = {
         "total_fichiers": total_fichiers,
         "sains": stats["SAIN"],
         "partiels": stats["PARTIEL"],
         "perdus": stats["ERREUR"],
+        "ignore": stats["IGNORE"],
         "taux_reussite": round(pourcentage_reussite, 2)
     }
 
@@ -169,6 +188,7 @@ def recuperer_dossier(dossier_source, dossier_destination, taille_bloc):
     print(f" Total des fichiers traités : {total_fichiers}")
     print(f" ✅ Fichiers copiés 100% intacts   : {stats['SAIN']}")
     print(f" ⚠️  Fichiers sauvés partiellement  : {stats['PARTIEL']} (Secteurs défectueux ignorés)")
+    print(f" ⏭️  Fichiers déjà présents (sautés) : {stats['IGNORE']}")
     print(f" ❌ Fichiers totalement perdus     : {stats['ERREUR']}")
     print("-" * 50)
     print(f" Taux de récupération global      : {pourcentage_reussite:.2f}%")
@@ -190,6 +210,11 @@ def main():
         default=4096, 
         help="Taille des blocs de lecture en octets (défaut: 4096)"
     )
+    parser.add_argument(
+    "-r", "--resume",
+    action="store_true",
+    help="Reprendre une copie en sautant les fichiers déjà présents et de même taille"
+    )
 
     args = parser.parse_args()
 
@@ -198,7 +223,7 @@ def main():
         return
 
     # Lancement du processus
-    recuperer_dossier(args.source, args.destination, args.block_size)
+    recuperer_dossier(args.source, args.destination, args.block_size, args.resume)
 
 if __name__ == "__main__":
     main()
